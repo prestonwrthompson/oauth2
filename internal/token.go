@@ -115,6 +115,15 @@ const (
 	AuthStyleInHeader AuthStyle = 2
 )
 
+// FormUrlEncodingStyle is a copy of the golang.org/x/oauth2 package's
+// FormUrlEncodingStyle type.
+type FormUrlEncodingStyle int
+
+const (
+	FormUrlEncodingStyleEnabled  FormUrlEncodingStyle = 0
+	FormUrlEncodingStyleDisabled FormUrlEncodingStyle = 1
+)
+
 // authStyleCache is the set of tokenURLs we've successfully used via
 // RetrieveToken and which style auth we ended up using.
 // It's called a cache, but it doesn't (yet?) shrink. It's expected that
@@ -160,7 +169,7 @@ func setAuthStyle(tokenURL string, v AuthStyle) {
 // as the POST body. An 'inParams' value of true means to send it in
 // the POST body (along with any values in v); false means to send it
 // in the Authorization header.
-func newTokenRequest(tokenURL, clientID, clientSecret string, v url.Values, authStyle AuthStyle) (*http.Request, error) {
+func newTokenRequest(tokenURL, clientID, clientSecret string, v url.Values, authStyle AuthStyle, formUrlEncodingStyle FormUrlEncodingStyle) (*http.Request, error) {
 	if authStyle == AuthStyleInParams {
 		v = cloneURLValues(v)
 		if clientID != "" {
@@ -170,12 +179,28 @@ func newTokenRequest(tokenURL, clientID, clientSecret string, v url.Values, auth
 			v.Set("client_secret", clientSecret)
 		}
 	}
-	req, err := http.NewRequest("POST", tokenURL+"?"+v.Encode(), strings.NewReader(""))
+
+	var u string
+	var body string
+	if formUrlEncodingStyle == FormUrlEncodingStyleEnabled {
+		u = tokenURL
+		body = v.Encode()
+	} else {
+		u = tokenURL + "?" + v.Encode()
+	}
+	req, err := http.NewRequest("POST", u, strings.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
+	if formUrlEncodingStyle == FormUrlEncodingStyleEnabled {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
 	if authStyle == AuthStyleInHeader {
-		req.SetBasicAuth(clientID, clientSecret)
+		if formUrlEncodingStyle == FormUrlEncodingStyleEnabled {
+			req.SetBasicAuth(url.QueryEscape(clientID), url.QueryEscape(clientSecret))
+		} else {
+			req.SetBasicAuth(clientID, clientSecret)
+		}
 	}
 	return req, nil
 }
@@ -188,7 +213,7 @@ func cloneURLValues(v url.Values) url.Values {
 	return v2
 }
 
-func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values, authStyle AuthStyle) (*Token, error) {
+func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string, v url.Values, authStyle AuthStyle, formUrlEncodingStyle FormUrlEncodingStyle) (*Token, error) {
 	needsAuthStyleProbe := authStyle == 0
 	if needsAuthStyleProbe {
 		if style, ok := lookupAuthStyle(tokenURL); ok {
@@ -198,7 +223,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 			authStyle = AuthStyleInHeader // the first way we'll try
 		}
 	}
-	req, err := newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
+	req, err := newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle, formUrlEncodingStyle)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +242,7 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 		// they went, but maintaining it didn't scale & got annoying.
 		// So just try both ways.
 		authStyle = AuthStyleInParams // the second way we'll try
-		req, _ = newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle)
+		req, _ = newTokenRequest(tokenURL, clientID, clientSecret, v, authStyle, formUrlEncodingStyle)
 		token, err = doTokenRoundTrip(ctx, req)
 	}
 	if needsAuthStyleProbe && err == nil {

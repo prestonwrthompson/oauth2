@@ -78,6 +78,11 @@ type Endpoint struct {
 	// client ID & client secret sent. The zero value means to
 	// auto-detect.
 	AuthStyle AuthStyle
+
+	// FormUrlEncodingStyle optionally specifies how to encode
+	// the data sent in the requests. The zero value means to
+	// use form url encoding.
+	FormUrlEncodingStyle FormUrlEncodingStyle
 }
 
 // AuthStyle represents how requests for tokens are authenticated
@@ -98,6 +103,20 @@ const (
 	// using HTTP Basic Authorization. This is an optional style
 	// described in the OAuth2 RFC 6749 section 2.3.1.
 	AuthStyleInHeader AuthStyle = 2
+)
+
+// FormUrlEncodingStyle represents how requests for tokens are
+// encoded to the server.
+type FormUrlEncodingStyle int
+
+const (
+	// FormUrlEncodingStyleEnabled means to encode the data
+	// using form url encoding.
+	FormUrlEncodingStyleEnabled FormUrlEncodingStyle = 0
+
+	// FormUrlEncodingStyleEnabled means to not encode the
+	// data using form url encoding.
+	FormUrlEncodingStyleDisabled FormUrlEncodingStyle = 1
 )
 
 var (

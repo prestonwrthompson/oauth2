@@ -47,6 +47,11 @@ type Config struct {
 	// client ID & client secret sent. The zero value means to
 	// auto-detect.
 	AuthStyle oauth2.AuthStyle
+
+	// FormUrlEncodingStyle optionally specifies how to encode
+	// the data sent in the requests. The zero value means to
+	// use form url encoding.
+	FormUrlEncodingStyle oauth2.FormUrlEncodingStyle
 }
 
 // Token uses client credentials to retrieve a token.
@@ -103,7 +108,7 @@ func (c *tokenSource) Token() (*oauth2.Token, error) {
 		v[k] = p
 	}
 
-	tk, err := internal.RetrieveToken(c.ctx, c.conf.ClientID, c.conf.ClientSecret, c.conf.TokenURL, v, internal.AuthStyle(c.conf.AuthStyle))
+	tk, err := internal.RetrieveToken(c.ctx, c.conf.ClientID, c.conf.ClientSecret, c.conf.TokenURL, v, internal.AuthStyle(c.conf.AuthStyle), internal.FormUrlEncodingStyle(c.conf.FormUrlEncodingStyle))
 	if err != nil {
 		if rErr, ok := err.(*internal.RetrieveError); ok {
 			return nil, (*oauth2.RetrieveError)(rErr)
